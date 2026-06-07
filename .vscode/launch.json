@@ -1,0 +1,28 @@
+{
+  // Run/Debug configs for the Sprout Flutter app.
+  // The Nature Hunt's on-device ML Kit recognition only runs on a real
+  // Android/iOS device or emulator — NOT in Chrome — so use a phone target.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sprout (debug)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Sprout (profile)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "Sprout (release)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "flutterMode": "release"
+    }
+  ]
+}

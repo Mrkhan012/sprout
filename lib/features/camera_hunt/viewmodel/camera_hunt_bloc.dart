@@ -2,16 +2,21 @@ import 'package:camera/camera.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../data/repositories/activity_repository.dart';
+import '../../../data/services/image_recognizer.dart';
+import '../../../data/services/image_recognizer_factory.dart';
 import 'camera_hunt_event.dart';
 import 'camera_hunt_state.dart';
 
 /// ViewModel for the Nature Hunt (Task 4).
 ///
 /// Owns the [CameraController] hardware resource (created on [HuntStarted],
-/// released on [close] / [HuntPaused]) and walks the child through finding &
-/// snapping five things, tagging each with a friendly label, then celebrating.
+/// released on [close] / [HuntPaused]) and an [ImageRecognizer] that identifies
+/// each snapped photo *on-device*. Walks the child through finding & snapping
+/// five things, auto-labels each with what the model sees, then celebrates.
 class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
-  CameraHuntBloc(this._repository) : super(const CameraHuntState()) {
+  CameraHuntBloc(this._repository, {ImageRecognizer? recognizer})
+      : _recognizer = recognizer ?? createImageRecognizer(),
+        super(const CameraHuntState()) {
     on<HuntStarted>(_onStarted);
     on<HuntPhotoCaptured>(_onCaptured);
     on<HuntLabelSelected>(_onLabelSelected);
@@ -22,12 +27,15 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
   }
 
   final ActivityRepository _repository;
+  final ImageRecognizer _recognizer;
 
   CameraController? _controller;
 
   /// Exposed (read-only) so the View can render the live preview.
   CameraController? get controller => _controller;
 
+  /// Friendly fallback labels used only when the model can't tell (or on a
+  /// platform without on-device recognition).
   List<String> get labelChoices => _repository.getLabelChoices();
 
   Future<void> _onStarted(
@@ -100,9 +108,23 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
     try {
       final file = await controller.takePicture();
       final bytes = await file.readAsBytes();
-      emit(state.copyWith(status: HuntStatus.captured, capturedPhoto: bytes));
+      // Show the snapshot immediately with a "looking…" spinner, then identify
+      // it on-device.
+      emit(state.copyWith(
+        status: HuntStatus.recognizing,
+        capturedPhoto: bytes,
+        results: const [],
+      ));
+      final results = await _recognizer.recognize(file.path);
+      // Guard against a retake/reset that landed while we were recognising.
+      if (state.status != HuntStatus.recognizing) return;
+      emit(state.copyWith(status: HuntStatus.captured, results: results));
     } catch (_) {
-      // Stay on the viewfinder if the snap failed; the child can try again.
+      // Couldn't snap or identify — drop the child back to the result step with
+      // no guesses so they can name it themselves or retake.
+      if (state.status == HuntStatus.recognizing) {
+        emit(state.copyWith(status: HuntStatus.captured, results: const []));
+      }
     }
   }
 
@@ -165,6 +187,7 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
   Future<void> close() async {
     await _controller?.dispose();
     _controller = null;
+    await _recognizer.close();
     return super.close();
   }
 }

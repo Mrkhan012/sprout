@@ -34,6 +34,11 @@ class AppStrings {
   // Camera hunt
   static const String huntGoal = 'Find & snap 5 things';
   static const String huntCta = 'Snap it!';
+  static const String huntLooking = 'Looking at your photo…';
+  static const String huntResultTitle = 'I spy with my little eye…';
+  static const String huntConfirmCta = 'Yes! Add to my hunt';
+  static const String huntMaybe = 'or maybe…';
+  static const String huntNotSure = "Hmm, I'm not sure what that is.";
   static const String huntPickLabel = 'What did you find?';
   static const String huntDone = 'Hunt complete!';
   static const String huntPermissionTitle = 'Camera needs a peek';

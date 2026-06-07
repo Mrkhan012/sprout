@@ -282,8 +282,12 @@ class _Viewfinder extends StatelessWidget {
     final controller = context.read<CameraHuntBloc>().controller;
     final radius = BorderRadius.circular(r.scale(28));
 
+    final showingPhoto = (state.status == HuntStatus.captured ||
+            state.status == HuntStatus.recognizing) &&
+        state.capturedPhoto != null;
+
     Widget content;
-    if (state.status == HuntStatus.captured && state.capturedPhoto != null) {
+    if (showingPhoto) {
       content = Image.memory(state.capturedPhoto!, fit: BoxFit.cover);
     } else if (controller != null && controller.value.isInitialized) {
       content = _CameraCover(controller: controller);
@@ -300,6 +304,9 @@ class _Viewfinder extends StatelessWidget {
         children: [
           const ColoredBox(color: AppColors.navyDeep),
           content,
+          // "Looking…" scrim while the on-device model identifies the photo.
+          if (state.status == HuntStatus.recognizing)
+            const _RecognizingScrim(),
           // Viewfinder frame.
           IgnorePointer(
             child: Container(
@@ -349,18 +356,208 @@ class _Controls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.status == HuntStatus.captured) {
-      return _LabelPicker(state: state);
+    return switch (state.status) {
+      HuntStatus.recognizing => const _RecognizingBar(),
+      HuntStatus.captured => _ResultPanel(state: state),
+      _ => PrimaryButton(
+          label: AppStrings.huntCta,
+          icon: Icons.photo_camera_rounded,
+          color: AppColors.gold,
+          foreground: AppColors.navy,
+          expand: true,
+          onPressed: state.status == HuntStatus.ready
+              ? () =>
+                  context.read<CameraHuntBloc>().add(const HuntPhotoCaptured())
+              : null,
+        ),
+    };
+  }
+}
+
+/// A translucent "Looking…" overlay shown over the frozen snapshot while the
+/// on-device model runs.
+class _RecognizingScrim extends StatelessWidget {
+  const _RecognizingScrim();
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.r;
+    return ColoredBox(
+      color: AppColors.navyDeep.withValues(alpha: 0.45),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(color: AppColors.teal),
+            SizedBox(height: r.scale(14)),
+            Text(
+              AppStrings.huntLooking,
+              style:
+                  AppTextStyles.title(color: AppColors.onDark, size: r.font(18)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The control-row twin of the scrim: keeps the layout height stable while the
+/// model thinks, instead of jumping between the snap button and the result.
+class _RecognizingBar extends StatelessWidget {
+  const _RecognizingBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.r;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: r.scale(20),
+          height: r.scale(20),
+          child: const CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: AppColors.teal,
+          ),
+        ),
+        SizedBox(width: r.scale(12)),
+        Text(
+          AppStrings.huntLooking,
+          style: AppTextStyles.body(color: AppColors.onDarkSoft, size: r.font(15)),
+        ),
+      ],
+    );
+  }
+}
+
+/// Shows the model's best guess ("I spy a 🌸 Flower!") with a confirm button
+/// and runner-up guesses. If the model couldn't tell, falls back to letting the
+/// child name it via [_LabelPicker].
+class _ResultPanel extends StatelessWidget {
+  const _ResultPanel({required this.state});
+
+  final CameraHuntState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = state.topResult;
+    if (top == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: context.r.scale(6)),
+            child: Text(
+              AppStrings.huntNotSure,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.body(
+                color: AppColors.onDarkSoft,
+                size: context.r.font(14),
+              ),
+            ),
+          ),
+          _LabelPicker(state: state),
+        ],
+      );
     }
-    return PrimaryButton(
-      label: AppStrings.huntCta,
-      icon: Icons.photo_camera_rounded,
-      color: AppColors.gold,
-      foreground: AppColors.navy,
-      expand: true,
-      onPressed: state.status == HuntStatus.ready
-          ? () => context.read<CameraHuntBloc>().add(const HuntPhotoCaptured())
-          : null,
+
+    final r = context.r;
+    final bloc = context.read<CameraHuntBloc>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          AppStrings.huntResultTitle,
+          style: AppTextStyles.label(color: AppColors.onDarkSoft, size: r.font(12)),
+        ),
+        SizedBox(height: r.scale(8)),
+        Text(
+          '${top.emoji}  ${top.label}',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.heading(color: AppColors.onDark, size: r.font(28)),
+        ),
+        SizedBox(height: r.scale(10)),
+        Pill(
+          text: "I'm ${top.confidencePercent}% sure!",
+          background: AppColors.teal,
+          foreground: AppColors.navy,
+          icon: Icons.auto_awesome_rounded,
+        ),
+        SizedBox(height: r.scale(14)),
+        PrimaryButton(
+          label: AppStrings.huntConfirmCta,
+          icon: Icons.check_rounded,
+          color: AppColors.gold,
+          foreground: AppColors.navy,
+          expand: true,
+          onPressed: () => bloc.add(HuntLabelSelected(top.display)),
+        ),
+        if (state.otherResults.isNotEmpty) ...[
+          SizedBox(height: r.scale(12)),
+          Text(
+            AppStrings.huntMaybe,
+            style:
+                AppTextStyles.label(color: AppColors.onDarkSoft, size: r.font(11)),
+          ),
+          SizedBox(height: r.scale(8)),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: r.scale(8),
+            runSpacing: r.scale(8),
+            children: [
+              for (final guess in state.otherResults)
+                _GuessChip(
+                  label: '${guess.emoji} ${guess.label}',
+                  onTap: () => bloc.add(HuntLabelSelected(guess.display)),
+                ),
+            ],
+          ),
+        ],
+        SizedBox(height: r.scale(8)),
+        TextButton.icon(
+          onPressed: () => bloc.add(const HuntRetake()),
+          icon: const Icon(Icons.refresh_rounded, color: AppColors.onDarkSoft),
+          label: Text(
+            'Retake',
+            style: AppTextStyles.button(
+              color: AppColors.onDarkSoft,
+              size: r.font(15),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A small tappable "or maybe…" alternative-guess chip.
+class _GuessChip extends StatelessWidget {
+  const _GuessChip({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = context.r;
+    return BouncyTap(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: r.scale(14),
+          vertical: r.scale(9),
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.onDark.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(r.scale(16)),
+          border: Border.all(color: AppColors.onDark.withValues(alpha: 0.18)),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.body(color: AppColors.onDark, size: r.font(14)),
+        ),
+      ),
     );
   }
 }

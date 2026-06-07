@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:sprout/app/sprout_app.dart';
 import 'package:sprout/data/models/reward.dart';
 import 'package:sprout/data/repositories/activity_repository.dart';
+import 'package:sprout/data/services/image_recognizer.dart';
+import 'package:sprout/data/services/label_catalog.dart';
 import 'package:sprout/features/rewards/viewmodel/rewards_cubit.dart';
 import 'package:sprout/features/tap_play/viewmodel/tap_play_bloc.dart';
 import 'package:sprout/features/tap_play/viewmodel/tap_play_event.dart';
@@ -74,5 +76,32 @@ void main() {
     expect(repo.getActivities(), isNotEmpty);
     expect(repo.getHuntTargets().length, 5);
     expect(repo.getLabelChoices(), isNotEmpty);
+  });
+
+  group('LabelCatalog', () {
+    test('maps a known label to its emoji, preserving the model text', () {
+      final result = LabelCatalog.present('Flower', 0.91);
+      expect(result.label, 'Flower');
+      expect(result.emoji, '🌸');
+      expect(result.confidencePercent, 91);
+      expect(result.display, '🌸 Flower');
+    });
+
+    test('is case-insensitive on the raw label', () {
+      expect(LabelCatalog.present('TEDDY BEAR', 0.5).emoji, '🧸');
+    });
+
+    test('falls back to a sparkle for an unknown label', () {
+      final result = LabelCatalog.present('Quasar', 0.5);
+      expect(result.emoji, '✨');
+      expect(result.label, 'Quasar');
+    });
+  });
+
+  test('UnavailableImageRecognizer yields no guesses (manual fallback)',
+      () async {
+    const recognizer = UnavailableImageRecognizer();
+    expect(await recognizer.recognize('any/path.jpg'), isEmpty);
+    await recognizer.close();
   });
 }
