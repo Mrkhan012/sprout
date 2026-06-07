@@ -1,0 +1,78 @@
+// Smoke + unit tests for Sprout.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:sprout/app/sprout_app.dart';
+import 'package:sprout/data/models/reward.dart';
+import 'package:sprout/data/repositories/activity_repository.dart';
+import 'package:sprout/features/rewards/viewmodel/rewards_cubit.dart';
+import 'package:sprout/features/tap_play/viewmodel/tap_play_bloc.dart';
+import 'package:sprout/features/tap_play/viewmodel/tap_play_event.dart';
+
+void main() {
+  setUpAll(() {
+    // Don't hit the network for fonts during tests — fall back gracefully.
+    GoogleFonts.config.allowRuntimeFetching = false;
+  });
+
+  testWidgets('App boots to the branded splash screen', (tester) async {
+    await tester.pumpWidget(const SproutApp());
+    await tester.pump();
+
+    expect(find.text('Sprout'), findsWidgets);
+    expect(
+      find.text('Little minds. Big adventures. Every day.'),
+      findsOneWidget,
+    );
+
+    // Advance past the splash reveal timer, then settle the entrance + CTA
+    // animations so no timers leak past the test.
+    await tester.pump(const Duration(milliseconds: 1400));
+    await tester.pumpAndSettle();
+  });
+
+  group('RewardsCubit', () {
+    test('awards a sticker and de-duplicates by id', () {
+      final cubit = RewardsCubit();
+      const reward = Reward(
+        id: 'r1',
+        label: 'Star',
+        emoji: '⭐',
+        color: Color(0xFF000000),
+      );
+
+      cubit.award(reward);
+      cubit.award(reward); // duplicate is ignored
+
+      expect(cubit.state.count, 1);
+    });
+  });
+
+  group('TapPlayBloc', () {
+    test('lays out a full field and completes when all bubbles pop', () async {
+      final bloc = TapPlayBloc(bubbleCount: 3)..add(const TapPlayStarted());
+      await pumpEventQueue();
+
+      expect(bloc.state.total, 3);
+      expect(bloc.state.isComplete, isFalse);
+
+      for (final bubble in List.of(bloc.state.bubbles)) {
+        bloc.add(BubblePopped(bubble.id));
+      }
+      await pumpEventQueue();
+
+      expect(bloc.state.popped, 3);
+      expect(bloc.state.isComplete, isTrue);
+
+      await bloc.close();
+    });
+  });
+
+  test('ActivityRepository serves activities and 5 hunt targets', () {
+    const repo = ActivityRepository();
+    expect(repo.getActivities(), isNotEmpty);
+    expect(repo.getHuntTargets().length, 5);
+    expect(repo.getLabelChoices(), isNotEmpty);
+  });
+}
