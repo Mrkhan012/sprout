@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../data/repositories/activity_repository.dart';
@@ -114,17 +115,34 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
         status: HuntStatus.recognizing,
         capturedPhoto: bytes,
         results: const [],
+        clearError: true,
       ));
       final results = await _recognizer.recognize(bytes);
       // Guard against a retake/reset that landed while we were recognising.
       if (state.status != HuntStatus.recognizing) return;
-      emit(state.copyWith(status: HuntStatus.captured, results: results));
-    } catch (_) {
-      // Couldn't snap or identify — drop the child back to the result step with
-      // no guesses so they can name it themselves or retake.
-      if (state.status == HuntStatus.recognizing) {
-        emit(state.copyWith(status: HuntStatus.captured, results: const []));
-      }
+      emit(state.copyWith(
+        status: HuntStatus.captured,
+        results: results,
+        clearError: true,
+      ));
+    } on RecognizerException catch (e) {
+      // A reportable failure (no key, billing, network): surface the reason so
+      // setup problems are visible, and still offer the manual picker.
+      _failRecognition(emit, e.message);
+    } catch (e) {
+      _failRecognition(emit, 'Could not take or read the photo. ($e)');
+    }
+  }
+
+  void _failRecognition(Emitter<CameraHuntState> emit, String message) {
+    debugPrint('Nature Hunt recognition failed → $message');
+    if (state.status == HuntStatus.recognizing ||
+        state.status == HuntStatus.ready) {
+      emit(state.copyWith(
+        status: HuntStatus.captured,
+        results: const [],
+        recognitionError: message,
+      ));
     }
   }
 

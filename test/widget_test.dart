@@ -149,11 +149,42 @@ void main() {
       await recognizer.close();
     });
 
-    test('returns no guesses (manual fallback) when no API key is configured',
-        () async {
+    test('throws a clear error when no API key is configured', () async {
       final recognizer = CloudImageRecognizer(apiKey: '');
       expect(recognizer.isConfigured, isFalse);
-      expect(await recognizer.recognize(Uint8List.fromList([1])), isEmpty);
+      expect(
+        () => recognizer.recognize(Uint8List.fromList([1])),
+        throwsA(isA<RecognizerException>()),
+      );
+      await recognizer.close();
+    });
+
+    test('surfaces the Vision error message (e.g. billing) on failure',
+        () async {
+      final mock = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'error': {
+              'code': 403,
+              'message': 'This API method requires billing to be enabled.',
+              'status': 'PERMISSION_DENIED',
+            },
+          }),
+          403,
+        );
+      });
+      final recognizer = CloudImageRecognizer(apiKey: 'k', client: mock);
+
+      expect(
+        () => recognizer.recognize(Uint8List.fromList([1])),
+        throwsA(
+          isA<RecognizerException>().having(
+            (e) => e.message,
+            'message',
+            contains('billing'),
+          ),
+        ),
+      );
       await recognizer.close();
     });
   });

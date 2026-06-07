@@ -443,20 +443,44 @@ class _ResultPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = state.topResult;
     if (top == null) {
+      final r = context.r;
       return Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: EdgeInsets.only(bottom: context.r.scale(6)),
+            padding: EdgeInsets.only(bottom: r.scale(6)),
             child: Text(
               AppStrings.huntNotSure,
               textAlign: TextAlign.center,
               style: AppTextStyles.body(
                 color: AppColors.onDarkSoft,
-                size: context.r.font(14),
+                size: r.font(14),
               ),
             ),
           ),
+          // Dev diagnostic: why recognition produced nothing (key/billing/etc.).
+          if (state.recognitionError != null)
+            Padding(
+              padding: EdgeInsets.only(bottom: r.scale(8)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      color: AppColors.gold, size: r.font(15)),
+                  SizedBox(width: r.scale(6)),
+                  Flexible(
+                    child: Text(
+                      state.recognitionError!,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.body(
+                        color: AppColors.gold,
+                        size: r.font(11),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           _LabelPicker(state: state),
         ],
       );

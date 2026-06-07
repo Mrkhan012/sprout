@@ -23,6 +23,7 @@ class CameraHuntState extends Equatable {
     this.currentIndex = 0,
     this.capturedPhoto,
     this.results = const [],
+    this.recognitionError,
     this.errorMessage,
   });
 
@@ -31,9 +32,13 @@ class CameraHuntState extends Equatable {
   final int currentIndex;
   final Uint8List? capturedPhoto;
 
-  /// What the on-device model thinks the snapped photo shows, best guess first.
-  /// Empty once cleared, or when the model couldn't tell.
+  /// What the recognizer thinks the snapped photo shows, best guess first.
+  /// Empty once cleared, or when it couldn't tell.
   final List<RecognizedLabel> results;
+
+  /// Why recognition of the current photo failed (no key, billing, network…),
+  /// shown as a small diagnostic under the "not sure" fallback. Null when fine.
+  final String? recognitionError;
 
   final String? errorMessage;
 
@@ -59,6 +64,8 @@ class CameraHuntState extends Equatable {
     Uint8List? capturedPhoto,
     List<RecognizedLabel>? results,
     bool clearCaptured = false,
+    String? recognitionError,
+    bool clearError = false,
     String? errorMessage,
   }) {
     return CameraHuntState(
@@ -68,11 +75,21 @@ class CameraHuntState extends Equatable {
       capturedPhoto:
           clearCaptured ? null : (capturedPhoto ?? this.capturedPhoto),
       results: clearCaptured ? const [] : (results ?? this.results),
+      recognitionError: clearCaptured || clearError
+          ? null
+          : (recognitionError ?? this.recognitionError),
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [status, items, currentIndex, capturedPhoto, results, errorMessage];
+  List<Object?> get props => [
+        status,
+        items,
+        currentIndex,
+        capturedPhoto,
+        results,
+        recognitionError,
+        errorMessage,
+      ];
 }

@@ -28,6 +28,18 @@ class RecognizedLabel extends Equatable {
   List<Object?> get props => [label, emoji, confidence];
 }
 
+/// Thrown when recognition fails for a *reason we can report* (no API key, a
+/// non-200 response, billing/permission errors, network failure) — as opposed to
+/// simply not being confident. The ViewModel surfaces [message] so setup
+/// problems are visible instead of silently looking like "couldn't tell".
+class RecognizerException implements Exception {
+  const RecognizerException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'RecognizerException: $message';
+}
+
 /// Abstraction over an image-labelling engine.
 ///
 /// The ViewModel depends only on this interface, never on a concrete engine, so
@@ -37,8 +49,9 @@ class RecognizedLabel extends Equatable {
 abstract class ImageRecognizer {
   /// Identify the contents of the JPEG [imageBytes], best guess first.
   ///
-  /// An empty list means "couldn't tell" — the UI then falls back to letting the
-  /// child name it themselves.
+  /// An empty list means "couldn't tell" (no confident labels). A hard failure
+  /// (no key, API/billing/network error) throws [RecognizerException] so the
+  /// reason can be shown, rather than being hidden as an empty result.
   Future<List<RecognizedLabel>> recognize(Uint8List imageBytes);
 
   /// Release any resources (e.g. the HTTP client) held by the engine.

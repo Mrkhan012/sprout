@@ -45,7 +45,11 @@ class CloudImageRecognizer implements ImageRecognizer {
 
   @override
   Future<List<RecognizedLabel>> recognize(Uint8List imageBytes) async {
-    if (_apiKey.isEmpty) return const [];
+    if (_apiKey.isEmpty) {
+      throw const RecognizerException(
+        'No Vision API key. Set --dart-define=VISION_API_KEY=... in launch.json.',
+      );
+    }
 
     final uri = Uri.parse('$_endpoint?key=$_apiKey');
     final payload = jsonEncode({
@@ -59,28 +63,45 @@ class CloudImageRecognizer implements ImageRecognizer {
       ],
     });
 
+    http.Response response;
     try {
-      final response = await _client.post(
+      response = await _client.post(
         uri,
         headers: const {'Content-Type': 'application/json'},
         body: payload,
       );
-      if (response.statusCode != 200) return const [];
-      return _parse(response.body);
-    } catch (_) {
-      // Network/parse failure → no guesses; the UI offers the manual picker.
-      return const [];
+    } catch (e) {
+      throw RecognizerException('Network error reaching Vision: $e');
     }
+
+    if (response.statusCode != 200) {
+      // Vision puts the real reason (bad key, API disabled, billing) here.
+      throw RecognizerException(
+        _errorMessage(response.body) ?? 'Vision HTTP ${response.statusCode}',
+      );
+    }
+    return _parse(response.body);
   }
 
-  /// Turn a Vision `images:annotate` response into kid-friendly labels.
+  /// Turn a Vision `images:annotate` response into kid-friendly labels, or throw
+  /// [RecognizerException] if the response carries an error instead of labels.
   List<RecognizedLabel> _parse(String body) {
-    final decoded = jsonDecode(body);
+    final Object? decoded = jsonDecode(body);
     if (decoded is! Map<String, dynamic>) return const [];
+
+    // Request-level error (e.g. key/permission) can arrive even with HTTP 200.
+    final topError = _messageFrom(decoded['error']);
+    if (topError != null) throw RecognizerException(topError);
+
     final responses = decoded['responses'];
     if (responses is! List || responses.isEmpty) return const [];
     final first = responses.first;
     if (first is! Map<String, dynamic>) return const [];
+
+    // Per-image error (e.g. "billing must be enabled").
+    final imageError = _messageFrom(first['error']);
+    if (imageError != null) throw RecognizerException(imageError);
+
     final annotations = first['labelAnnotations'];
     if (annotations is! List) return const [];
 
@@ -94,6 +115,25 @@ class CloudImageRecognizer implements ImageRecognizer {
       results.add(LabelCatalog.present(description, score));
     }
     return results;
+  }
+
+  /// Extract `error.message` from a raw Vision error body, if present.
+  String? _errorMessage(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      return decoded is Map<String, dynamic> ? _messageFrom(decoded['error']) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// `{code, message, status}` → `"PERMISSION_DENIED: <message>"`.
+  String? _messageFrom(Object? error) {
+    if (error is! Map<String, dynamic>) return null;
+    final message = error['message'] as String?;
+    if (message == null || message.isEmpty) return null;
+    final status = error['status'] as String?;
+    return status == null ? message : '$status: $message';
   }
 
   @override
