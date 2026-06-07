@@ -1,11 +1,17 @@
 // Smoke + unit tests for Sprout.
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:sprout/app/sprout_app.dart';
 import 'package:sprout/data/models/reward.dart';
 import 'package:sprout/data/repositories/activity_repository.dart';
+import 'package:sprout/data/services/cloud_image_recognizer.dart';
 import 'package:sprout/data/services/image_recognizer.dart';
 import 'package:sprout/data/services/label_catalog.dart';
 import 'package:sprout/features/rewards/viewmodel/rewards_cubit.dart';
@@ -91,6 +97,11 @@ void main() {
       expect(LabelCatalog.present('TEDDY BEAR', 0.5).emoji, '🧸');
     });
 
+    test('matches a known word inside a multi-word cloud label', () {
+      // Cloud Vision often returns phrases like "Personal computer".
+      expect(LabelCatalog.present('Personal computer', 0.9).emoji, '💻');
+    });
+
     test('falls back to a sparkle for an unknown label', () {
       final result = LabelCatalog.present('Quasar', 0.5);
       expect(result.emoji, '✨');
@@ -101,7 +112,49 @@ void main() {
   test('UnavailableImageRecognizer yields no guesses (manual fallback)',
       () async {
     const recognizer = UnavailableImageRecognizer();
-    expect(await recognizer.recognize('any/path.jpg'), isEmpty);
+    expect(await recognizer.recognize(Uint8List(0)), isEmpty);
     await recognizer.close();
+  });
+
+  group('CloudImageRecognizer', () {
+    test('parses Vision labels, sparks emoji & drops low-confidence guesses',
+        () async {
+      final mock = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'responses': [
+              {
+                'labelAnnotations': [
+                  {'description': 'Laptop', 'score': 0.98},
+                  {'description': 'Computer', 'score': 0.95},
+                  {'description': 'Smudge', 'score': 0.20}, // below threshold
+                ],
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final recognizer = CloudImageRecognizer(
+        apiKey: 'test-key',
+        client: mock,
+        confidenceThreshold: 0.6,
+      );
+      final results = await recognizer.recognize(Uint8List.fromList([1, 2, 3]));
+
+      expect(results.map((r) => r.label), ['Laptop', 'Computer']);
+      expect(results.first.emoji, '💻');
+      expect(results.first.confidencePercent, 98);
+      await recognizer.close();
+    });
+
+    test('returns no guesses (manual fallback) when no API key is configured',
+        () async {
+      final recognizer = CloudImageRecognizer(apiKey: '');
+      expect(recognizer.isConfigured, isFalse);
+      expect(await recognizer.recognize(Uint8List.fromList([1])), isEmpty);
+      await recognizer.close();
+    });
   });
 }

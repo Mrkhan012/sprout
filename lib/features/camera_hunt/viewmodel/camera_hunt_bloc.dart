@@ -11,8 +11,8 @@ import 'camera_hunt_state.dart';
 ///
 /// Owns the [CameraController] hardware resource (created on [HuntStarted],
 /// released on [close] / [HuntPaused]) and an [ImageRecognizer] that identifies
-/// each snapped photo *on-device*. Walks the child through finding & snapping
-/// five things, auto-labels each with what the model sees, then celebrates.
+/// each snapped photo. Walks the child through finding & snapping five things,
+/// auto-labels each with what the recognizer sees, then celebrates.
 class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
   CameraHuntBloc(this._repository, {ImageRecognizer? recognizer})
       : _recognizer = recognizer ?? createImageRecognizer(),
@@ -109,13 +109,13 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
       final file = await controller.takePicture();
       final bytes = await file.readAsBytes();
       // Show the snapshot immediately with a "looking…" spinner, then identify
-      // it on-device.
+      // it via the recognizer.
       emit(state.copyWith(
         status: HuntStatus.recognizing,
         capturedPhoto: bytes,
         results: const [],
       ));
-      final results = await _recognizer.recognize(file.path);
+      final results = await _recognizer.recognize(bytes);
       // Guard against a retake/reset that landed while we were recognising.
       if (state.status != HuntStatus.recognizing) return;
       emit(state.copyWith(status: HuntStatus.captured, results: results));

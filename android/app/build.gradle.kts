@@ -24,8 +24,7 @@ android {
         applicationId = "com.example.sprout"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // ML Kit on-device image labelling needs API 21+ for the Nature Hunt.
-        minSdk = maxOf(flutter.minSdkVersion, 21)
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

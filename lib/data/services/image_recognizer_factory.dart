@@ -1,10 +1,7 @@
+import 'cloud_image_recognizer.dart';
 import 'image_recognizer.dart';
-// Pick the platform implementation at compile time: ML Kit on mobile (the
-// default, `dart:io`), a no-op fallback on web. This keeps the ML Kit plugin —
-// and its `dart:io` dependency — out of the web build so the app still compiles
-// for Chrome.
-import 'image_recognizer_io.dart'
-    if (dart.library.html) 'image_recognizer_web.dart' as platform;
 
-/// The right [ImageRecognizer] for the current platform.
-ImageRecognizer createImageRecognizer() => platform.createImageRecognizer();
+/// The recognizer used by the app. Cloud Vision is plain HTTPS, so a single
+/// implementation works on mobile and web alike. Reads its API key from the
+/// `VISION_API_KEY` compile-time define (see [CloudImageRecognizer]).
+ImageRecognizer createImageRecognizer() => CloudImageRecognizer();

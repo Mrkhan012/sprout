@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Sprout uses the camera for the "Nature Hunt" learning activity (Task 4). -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The Nature Hunt sends the snapped photo to the Cloud Vision API to label it. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 

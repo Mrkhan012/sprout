@@ -14,10 +14,23 @@ class LabelCatalog {
 
   /// Present [raw] (a model label) as a friendly result carrying [confidence].
   static RecognizedLabel present(String raw, double confidence) {
-    final key = raw.trim().toLowerCase();
+    final clean = raw.trim();
+    final key = clean.toLowerCase();
+    // Exact match first; otherwise (cloud labels are often multi-word, e.g.
+    // "Personal computer") match on any known word so we still find an emoji.
+    var emoji = _emoji[key];
+    if (emoji == null) {
+      for (final word in key.split(RegExp(r'[^a-z]+'))) {
+        final hit = _emoji[word];
+        if (hit != null) {
+          emoji = hit;
+          break;
+        }
+      }
+    }
     return RecognizedLabel(
-      label: raw.trim(),
-      emoji: _emoji[key] ?? _fallbackEmoji,
+      label: clean,
+      emoji: emoji ?? _fallbackEmoji,
       confidence: confidence,
     );
   }
