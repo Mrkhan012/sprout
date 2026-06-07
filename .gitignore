@@ -18,10 +18,10 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code: the launch config holds the Cloud Vision API key (injected via
+# --dart-define=VISION_API_KEY=...), so keep it OUT of version control.
+# Other .vscode files (settings/tasks) are safe to share if you add them.
+.vscode/launch.json
 
 # Flutter/Dart/Pub related
 **/doc/api/
