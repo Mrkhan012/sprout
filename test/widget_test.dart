@@ -1,6 +1,7 @@
 // Smoke + unit tests for Sprout.
 
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -14,7 +15,12 @@ import 'package:sprout/data/repositories/activity_repository.dart';
 import 'package:sprout/data/services/cloud_image_recognizer.dart';
 import 'package:sprout/data/services/image_recognizer.dart';
 import 'package:sprout/data/services/label_catalog.dart';
+import 'package:sprout/data/services/speech_service.dart';
+import 'package:sprout/features/puzzle/viewmodel/puzzle_bloc.dart';
+import 'package:sprout/features/puzzle/viewmodel/puzzle_event.dart';
+import 'package:sprout/features/puzzle/viewmodel/puzzle_state.dart';
 import 'package:sprout/features/rewards/viewmodel/rewards_cubit.dart';
+import 'package:sprout/features/story_time/viewmodel/story_cubit.dart';
 import 'package:sprout/features/tap_play/viewmodel/tap_play_bloc.dart';
 import 'package:sprout/features/tap_play/viewmodel/tap_play_event.dart';
 
@@ -59,7 +65,10 @@ void main() {
 
   group('TapPlayBloc', () {
     test('lays out a full field and completes when all bubbles pop', () async {
-      final bloc = TapPlayBloc(bubbleCount: 3)..add(const TapPlayStarted());
+      final bloc = TapPlayBloc(
+        bubbleCount: 3,
+        speech: SpeechService.silent(),
+      )..add(const TapPlayStarted());
       await pumpEventQueue();
 
       expect(bloc.state.total, 3);
@@ -82,6 +91,80 @@ void main() {
     expect(repo.getActivities(), isNotEmpty);
     expect(repo.getHuntTargets().length, 5);
     expect(repo.getLabelChoices(), isNotEmpty);
+  });
+
+  test('ActivityRepository serves a story and valid puzzle rounds', () {
+    const repo = ActivityRepository();
+    expect(repo.getStory().pages, isNotEmpty);
+
+    final rounds = repo.getPuzzleRounds();
+    expect(rounds, isNotEmpty);
+    for (final round in rounds) {
+      // Every round must contain exactly the target as one of its options.
+      final matches =
+          round.options.where((o) => o.label == round.targetLabel);
+      expect(matches.length, 1, reason: 'one correct option per round');
+      expect(round.answerId, matches.first.id);
+    }
+  });
+
+  group('StoryCubit', () {
+    test('pages forward and back, then finishes on the last page', () {
+      final cubit = StoryCubit(
+        const ActivityRepository(),
+        speech: SpeechService.silent(),
+      )..load();
+
+      expect(cubit.state.index, 0);
+      expect(cubit.state.total, greaterThan(1));
+
+      cubit.next();
+      expect(cubit.state.index, 1);
+      cubit.previous();
+      expect(cubit.state.index, 0);
+
+      while (!cubit.state.isLast) {
+        cubit.next();
+      }
+      expect(cubit.state.finished, isFalse);
+      cubit.finish();
+      expect(cubit.state.finished, isTrue);
+
+      cubit.close();
+    });
+  });
+
+  group('PuzzleBloc', () {
+    test('marks a wrong tap, and completes after every correct match',
+        () async {
+      final bloc = PuzzleBloc(
+        const ActivityRepository(),
+        speech: SpeechService.silent(),
+        random: math.Random(1), // deterministic option shuffle
+      )..add(const PuzzleStarted());
+      await pumpEventQueue();
+
+      expect(bloc.state.total, greaterThan(0));
+      final round = bloc.state.current!;
+
+      // A wrong tap flags that tile and doesn't advance.
+      final wrongId =
+          round.options.firstWhere((o) => o.id != round.answerId).id;
+      bloc.add(PuzzleOptionTapped(wrongId));
+      await pumpEventQueue();
+      expect(bloc.state.wrongId, wrongId);
+      expect(bloc.state.solved, 0);
+
+      // Tapping the correct option each round eventually completes the puzzle.
+      while (bloc.state.status == PuzzleStatus.playing) {
+        bloc.add(PuzzleOptionTapped(bloc.state.current!.answerId));
+        await pumpEventQueue();
+      }
+      expect(bloc.state.status, PuzzleStatus.complete);
+      expect(bloc.state.solved, bloc.state.total);
+
+      await bloc.close();
+    });
   });
 
   group('LabelCatalog', () {

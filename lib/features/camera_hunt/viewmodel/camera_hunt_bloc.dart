@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/repositories/activity_repository.dart';
 import '../../../data/services/image_recognizer.dart';
 import '../../../data/services/image_recognizer_factory.dart';
+import '../../../data/services/speech_service.dart';
 import 'camera_hunt_event.dart';
 import 'camera_hunt_state.dart';
 
@@ -15,8 +16,12 @@ import 'camera_hunt_state.dart';
 /// each snapped photo. Walks the child through finding & snapping five things,
 /// auto-labels each with what the recognizer sees, then celebrates.
 class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
-  CameraHuntBloc(this._repository, {ImageRecognizer? recognizer})
-      : _recognizer = recognizer ?? createImageRecognizer(),
+  CameraHuntBloc(
+    this._repository, {
+    ImageRecognizer? recognizer,
+    SpeechService? speech,
+  })  : _recognizer = recognizer ?? createImageRecognizer(),
+        _speech = speech ?? SpeechService(),
         super(const CameraHuntState()) {
     on<HuntStarted>(_onStarted);
     on<HuntPhotoCaptured>(_onCaptured);
@@ -29,6 +34,7 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
 
   final ActivityRepository _repository;
   final ImageRecognizer _recognizer;
+  final SpeechService _speech;
 
   CameraController? _controller;
 
@@ -125,6 +131,9 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
         results: results,
         clearError: true,
       ));
+      if (results.isNotEmpty) {
+        _speech.speak('I spy a ${results.first.label}!');
+      }
     } on RecognizerException catch (e) {
       // A reportable failure (no key, billing, network): surface the reason so
       // setup problems are visible, and still offer the manual picker.
@@ -166,6 +175,10 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
       status: allFound ? HuntStatus.complete : HuntStatus.ready,
       clearCaptured: true,
     ));
+
+    _speech.speak(allFound
+        ? 'Hooray! You found all five! Well done!'
+        : 'Great find!');
   }
 
   void _onRetake(HuntRetake event, Emitter<CameraHuntState> emit) {
@@ -206,6 +219,7 @@ class CameraHuntBloc extends Bloc<CameraHuntEvent, CameraHuntState> {
     await _controller?.dispose();
     _controller = null;
     await _recognizer.close();
+    await _speech.dispose();
     return super.close();
   }
 }

@@ -48,5 +48,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Lets flutter_tts find a text-to-speech engine on Android 11+ (Story
+             Time, Puzzle and the games read aloud). -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
     </queries>
 </manifest>
