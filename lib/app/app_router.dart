@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../core/constants/app_routes.dart';
 import '../features/camera_hunt/view/camera_hunt_screen.dart';
 import '../features/home/view/home_screen.dart';
+import '../features/puzzle/view/puzzle_screen.dart';
 import '../features/rewards/view/rewards_screen.dart';
 import '../features/splash/view/splash_screen.dart';
+import '../features/story_time/view/story_screen.dart';
 import '../features/tap_play/view/tap_play_screen.dart';
 
 /// Central route table. Each feature exposes a single screen widget; the
@@ -19,6 +21,8 @@ class AppRouter {
       AppRoutes.home => const HomeScreen(),
       AppRoutes.tapPlay => const TapPlayScreen(),
       AppRoutes.cameraHunt => const CameraHuntScreen(),
+      AppRoutes.storyTime => const StoryScreen(),
+      AppRoutes.puzzle => const PuzzleScreen(),
       AppRoutes.rewards => const RewardsScreen(),
       _ => const SplashScreen(),
     };

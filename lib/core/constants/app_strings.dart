@@ -25,7 +25,9 @@ class AppStrings {
   static const String rewardsTitle = 'My Stickers';
   static const String rewardsSub = 'See what you have earned';
   static const String storyTitle = 'Story Time';
-  static const String storySub = 'A tale before bed';
+  static const String storySub = 'A read-aloud tale';
+  static const String puzzleTitle = 'Find It!';
+  static const String puzzleSub = 'Match & learn with voice';
 
   // Tap & play
   static const String tapPlayGoal = 'Pop them all!';
@@ -45,6 +47,17 @@ class AppStrings {
   static const String huntPermissionBody =
       'Sprout uses the camera so you can snap the things you find. '
       'Please allow camera access to start the hunt.';
+
+  // Story Time
+  static const String storyNext = 'Next page';
+  static const String storyFinish = 'The End';
+  static const String storyTheEnd = 'The End!';
+  static const String storyTapToHear = 'Tap the picture to hear it again';
+
+  // Puzzle
+  static const String puzzleGoal = 'Find it!';
+  static const String puzzleFind = 'Can you find…';
+  static const String puzzleDone = 'You matched them all!';
 
   // Rewards
   static const String rewardsEmpty = 'Play an activity to earn your first sticker!';

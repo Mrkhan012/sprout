@@ -7,5 +7,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String tapPlay = '/tap-play';
   static const String cameraHunt = '/camera-hunt';
+  static const String storyTime = '/story-time';
+  static const String puzzle = '/puzzle';
   static const String rewards = '/rewards';
 }
